@@ -1,5 +1,5 @@
 # 433MHz-MQTT-Bridge
-Real Time departure times of Zurich transportation system and weather display with Wemos D1
+Dedicated Processor to receive 433MHz signals from a switch and to translate to MQTT commands
 
 I have lots of intelligent nodes/IOTs (ESP8266s) around my living room and of course I can switch lights on and off through Domoticz or Alexa.
 My wife though loves common wall switches. A good solution are these 433Mhz wall mount switches. The program running on a Wemos D1 mini 
