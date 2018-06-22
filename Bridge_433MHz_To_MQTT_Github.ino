@@ -1,6 +1,7 @@
 /*
   433MHz to MQTT bridge
-  Version 1.0     26. Mar 2018
+  Version 1.1     15.6.2018 Added logging facility to Syslog
+  Version 1.0     26.3.2018
 
   Funtion: Reads sensor values via a 433MHz receiver and the RCSwitch library
            The sensor id maps to an MQTT topic and the value is published to an MQTT broker
@@ -19,20 +20,49 @@ Pin assignments:
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
 #include <PubSubClient.h>
-const bool DEBUG = 0; //Set to 1 for print 
+#include <Syslog.h>
+const bool DEBUG = 0; //Set to 1 for debug on
 
 //
 // WIFI and MQTT setup
 //
-const char* ssid = "*********";
-const char* password = "***************";
+const char* ssid = "***";
+const char* password = "***";
 const char* mqtt_server = "192.168.178.59";
 const char* mqtt_username = "mqtt";
 const char* mqtt_password = "***";
 char* OutTopic = "domoticz/in"; 
+
+//DOMOTICZ IDX Definitions
+// On Switch S1
 const int KITCHEN_TOP_IDX = 17;//Arilux
 const int KITCHEN_BOARD_IDX = 54;//ESP01
 const int STONELAMP_IDX = 55;//Wemos D1 mini
+// On S2
+const int LIGHT_IDX = 1;//Sonoff Basic
+const int CIGAR_IDX = 45;// \Wemos D1 mini
+const int SPOT_IDX = 46; // /Wemos D1 mini (same as 45)
+// On S3
+const int WARDROBE_IDX = 16;//Wemos D1 mini
+const int TREPPENLICHT_IDX = 57;//Wemos D1 retired
+// On S4
+const int SPOT_DINING_ROOM_IDX = 56;//Sonoff Basic
+const int OTHER2_IDX = 0;//
+const int OTHER3_IDX = 0;//
+
+// Syslog server connection info
+#define SYSLOG_SERVER "192.168.178.59"
+#define SYSLOG_PORT 514
+
+// This device info
+#define DEVICE_HOSTNAME "wemos80"
+#define APP_NAME "433MHz-MQTT-Bridge"
+
+// A UDP instance to let us send and receive packets over UDP
+WiFiUDP udpClient;
+
+// Create a new syslog instance with LOG_KERN facility
+Syslog syslog(udpClient, SYSLOG_SERVER, SYSLOG_PORT, DEVICE_HOSTNAME, APP_NAME, LOG_KERN);
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -138,24 +168,50 @@ void reconnect() {
 
 
 void BridgeToMQTT(long message){
-  Serial.println(message);
+  syslog.logf(LOG_INFO, "Received code %d", message);
   switch (message) {
-      case 1182162:  
-        publish(KITCHEN_TOP_IDX);
-      break;
-      case 1182168:  
-        publish(KITCHEN_BOARD_IDX);
-      break;
-      case 1182164:  
+      case 1182164: //S1-1  
         publish(STONELAMP_IDX);
       break;
+      case 1182168: //S1-2  
+        publish(KITCHEN_BOARD_IDX);
+      break;
+      case 1182162: //S1-3 
+        publish(KITCHEN_TOP_IDX);
+      break;
+      
+      case 3576436: //S2-1 
+        publish(LIGHT_IDX);
+      break;
+      case 3576440: //S2-2  
+        publish(CIGAR_IDX);
+      break;
+      case 3576434: //S2-3  
+        publish(SPOT_IDX);
+      break;
+      
+      case 244168: //S3-1 
+        publish(WARDROBE_IDX);
+      break;
+      case 244162: //S3-2  
+        publish(TREPPENLICHT_IDX);
+      break;
+      
+      case 11726868: //S4-1 
+        publish(SPOT_DINING_ROOM_IDX);
+      break;
+      case 11726872: //S4-2  
+        //publish(IDX);
+      break;
+      case 11726866: //S4-3  
+        //publish(IDX);
+      break;
   }
-  wait(500);
+  wait(400);
   mySwitch.resetAvailable();
 }
 
 
-// {"command": "switchlight", "idx": 55, "switchcmd": "Toggle"}
 void publish(int idx){ 
   char output[130];
   snprintf_P(output, sizeof(output), PSTR("{\"command\": \"switchlight\",\"idx\":%d,\"switchcmd\": \"Toggle\"}"),idx);
@@ -168,4 +224,5 @@ void wait (int ms) {
   long end_time = current_time + ms; 
   while (current_time < end_time) current_time = millis();
   yield();
+  ArduinoOTA.handle();
 }
